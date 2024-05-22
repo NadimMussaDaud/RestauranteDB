@@ -1,6 +1,14 @@
+DROP DATABASE IF EXISTS restaurante_db;
 
+-- Criar a base de dados
+CREATE DATABASE restaurante_db;
+
+-- Utilizar a base de dados restaurante_db
+USE restaurante_db;
+
+-- Criar as tabelas
 CREATE TABLE Restaurantes (
-    NumeroCadeia INT PRIMARY KEY,
+    NúmeroCadeia INT PRIMARY KEY,
     NomeRestaurante VARCHAR(100),
     HoraAbertura TIME,
     HoraFecho TIME,
@@ -26,9 +34,9 @@ CREATE TABLE Pessoas (
     email VARCHAR(100)
 );
 
-CREATE TABLE Funcionarios (
+CREATE TABLE Funcionários (
     CC VARCHAR(20),
-    funcao VARCHAR(50),
+    função VARCHAR(50),
     PRIMARY KEY (CC),
     FOREIGN KEY (CC) REFERENCES Pessoas(CC)
 );
@@ -40,22 +48,22 @@ CREATE TABLE Fornecedores (
     FOREIGN KEY (CC) REFERENCES Pessoas(CC)
 );
 
-CREATE TABLE Direcao (
+CREATE TABLE Direção (
     CC VARCHAR(20),
-    bonus DECIMAL(10, 2),
-    funcao VARCHAR(50),
+    bónus DECIMAL(10, 2),
+    função VARCHAR(50),
     PRIMARY KEY (CC),
     FOREIGN KEY (CC) REFERENCES Pessoas(CC),
-    FOREIGN KEY (funcao) REFERENCES Funcionarios(funcao)
+    FOREIGN KEY (função) REFERENCES Funcionários(função)
 );
 
 CREATE TABLE Chef (
     CC VARCHAR(20),
     Estrelas INT,
-    funcao VARCHAR(50),
+    função VARCHAR(50),
     PRIMARY KEY (CC),
     FOREIGN KEY (CC) REFERENCES Pessoas(CC),
-    FOREIGN KEY (funcao) REFERENCES Funcionarios(funcao)
+    FOREIGN KEY (função) REFERENCES Funcionários(função)
 );
 
 CREATE TABLE Contactos (
@@ -70,22 +78,22 @@ CREATE TABLE Pedidos (
     Hora TIME,
     Data DATE,
     CP INT,
-    NumeroCadeia INT,
+    NúmeroCadeia INT,
     CC VARCHAR(20),
     FOREIGN KEY (CP) REFERENCES Restaurantes(CP),
-    FOREIGN KEY (NumeroCadeia) REFERENCES Restaurantes(NumeroCadeia),
+    FOREIGN KEY (NúmeroCadeia) REFERENCES Restaurantes(NúmeroCadeia),
     FOREIGN KEY (CC) REFERENCES Pessoas(CC)
 );
 
-CREATE TABLE Cardapio (
-    Epoca VARCHAR(50) PRIMARY KEY,
+CREATE TABLE Cardápio (
+    Época VARCHAR(50) PRIMARY KEY,
     NomeCardapio VARCHAR(100)
 );
 
 CREATE TABLE Ingredientes (
     CodigoIngredientes INT PRIMARY KEY,
     Nome VARCHAR(100),
-    Proveniencia VARCHAR(100),
+    Proveniência VARCHAR(100),
     DataValidade DATE,
     Custo DECIMAL(10, 2)
 );
@@ -109,48 +117,48 @@ CREATE TABLE Bebida (
 
 CREATE TABLE Stock (
     CodigoIngredientes INT,
-    NumeroCadeia INT,
+    NúmeroCadeia INT,
     Quantidade INT,
-    PRIMARY KEY (CodigoIngredientes, NumeroCadeia),
+    PRIMARY KEY (CodigoIngredientes, NúmeroCadeia),
     FOREIGN KEY (CodigoIngredientes) REFERENCES Ingredientes(CodigoIngredientes),
-    FOREIGN KEY (NumeroCadeia) REFERENCES Restaurantes(NumeroCadeia)
+    FOREIGN KEY (NúmeroCadeia) REFERENCES Restaurantes(NúmeroCadeia)
 );
 
-CREATE TABLE Inventario (
-    NumeroCadeia INT,
+CREATE TABLE Inventário (
+    NúmeroCadeia INT,
     codigoBens INT,
-    QuantidadeInventario INT,
-    PRIMARY KEY (NumeroCadeia, codigoBens),
-    FOREIGN KEY (NumeroCadeia) REFERENCES Restaurantes(NumeroCadeia),
+    QuantidadeInventário INT,
+    PRIMARY KEY (NúmeroCadeia, codigoBens),
+    FOREIGN KEY (NúmeroCadeia) REFERENCES Restaurantes(NúmeroCadeia),
     FOREIGN KEY (codigoBens) REFERENCES Bens(codigoBens)
 );
 
 CREATE TABLE Frequentam (
     CC VARCHAR(20),
-    NumeroCadeia INT,
-    PRIMARY KEY (CC, NumeroCadeia),
+    NúmeroCadeia INT,
+    PRIMARY KEY (CC, NúmeroCadeia),
     FOREIGN KEY (CC) REFERENCES Pessoas(CC),
-    FOREIGN KEY (NumeroCadeia) REFERENCES Restaurantes(NumeroCadeia)
+    FOREIGN KEY (NúmeroCadeia) REFERENCES Restaurantes(NúmeroCadeia)
 );
 
 CREATE TABLE Cartas (
-    Epoca VARCHAR(50),
-    NumeroCadeia INT,
+    Época VARCHAR(50),
+    NúmeroCadeia INT,
     NomeItem VARCHAR(100),
-    PRIMARY KEY (Epoca, NumeroCadeia, NomeItem),
-    FOREIGN KEY (NumeroCadeia) REFERENCES Restaurantes(NumeroCadeia),
-    FOREIGN KEY (Epoca) REFERENCES Cardapio(Epoca),
+    PRIMARY KEY (Época, NúmeroCadeia, NomeItem),
+    FOREIGN KEY (NúmeroCadeia) REFERENCES Restaurantes(NúmeroCadeia),
+    FOREIGN KEY (Época) REFERENCES Cardápio(Época),
     FOREIGN KEY (NomeItem) REFERENCES Item(NomeItem)
 );
 
 CREATE TABLE Gere (
     CC VARCHAR(20),
-    NumeroCadeia INT,
-    Direcao_CC VARCHAR(20),
-    PRIMARY KEY (CC, NumeroCadeia),
+    NúmeroCadeia INT,
+    Direção_CC VARCHAR(20),
+    PRIMARY KEY (CC, NúmeroCadeia),
     FOREIGN KEY (CC) REFERENCES Pessoas(CC),
-    FOREIGN KEY (NumeroCadeia) REFERENCES Restaurantes(NumeroCadeia),
-    FOREIGN KEY (Direcao_CC) REFERENCES Funcionarios(CC)
+    FOREIGN KEY (NúmeroCadeia) REFERENCES Restaurantes(NúmeroCadeia),
+    FOREIGN KEY (Direção_CC) REFERENCES Funcionários(CC)
 );
 
 CREATE TABLE Fornece (
@@ -170,7 +178,7 @@ CREATE TABLE Encomenda (
     FOREIGN KEY (NomeItem) REFERENCES Item(NomeItem)
 );
 
-CREATE TABLE Constituicao (
+CREATE TABLE Constituição (
     CodigoIngrediente INT,
     NomeItem VARCHAR(100),
     QuantidadeConst INT,
@@ -180,11 +188,11 @@ CREATE TABLE Constituicao (
 );
 
 CREATE TABLE Menu (
-    Preco DECIMAL(10, 2),
-    Descricao VARCHAR(255),
+    Preço DECIMAL(10, 2),
+    Descrição VARCHAR(255),
     NomeItem VARCHAR(100),
-    Epoca VARCHAR(50),
-    PRIMARY KEY (NomeItem, Epoca),
+    Época VARCHAR(50),
+    PRIMARY KEY (NomeItem, Época),
     FOREIGN KEY (NomeItem) REFERENCES Item(NomeItem),
-    FOREIGN KEY (Epoca) REFERENCES Cardapio(Epoca)
+    FOREIGN KEY (Época) REFERENCES Cardápio(Época)
 );
