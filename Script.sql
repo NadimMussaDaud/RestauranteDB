@@ -1,13 +1,15 @@
 -- TODO: Criar asserções para os ISA para disjoint e ISA totais
 /* 
-- Efetuar pedido se houver espaço no restaurante TRIGGER
-- Efetuar ITEMS com Ingredientes que estejam dentro do prazo TRIGGER
+- Efetuar pedido se houver espaço no restaurante. Acrescentar atributo numero_clientes em pedido TRIGGER
+- Subtrair em stock uma vez efetuado um pedido
+- Efetuar ITEMS com Ingredientes que estejam dentro do prazo TRIGGER #DONE
 - Para encomendar ITEM Ingredientes todos tem que ter stock no local da encomenda TRIGGER
 - Certificar que todos empregados trabalham em algum lugar e em apenas 1???
 - A cada momento apenas pode existir um menu de uma epoca em um restaurante.
 - Empregados precisam necessariamente de ter algum gerente.
 - Um item pode ser um ingrediente. Certificar que o Item se é prato não é mais nada
 -Um prato ou bebida tem que fazer parte de um item #DONE
+
 */
 
 
@@ -77,12 +79,14 @@ CREATE TABLE CONTACTOS (
 CREATE TABLE PEDIDOS (
     NUMEROPEDIDO INT PRIMARY KEY,
     HORA TIMESTAMP,
-    DATA DATE,
+    TEMPO_TERMINO TIMESTAMP NOT NULL,
+    NUMEROCLIENTES INT NOT NULL,
     CP INT,
     NUMEROCADEIA INT,
     CC VARCHAR(20),
+
     FOREIGN KEY (CP) REFERENCES MORADA,
-    FOREIGN KEY (NUMEROCADEIA) REFERENCES RESTAURANTES,
+    FOREIGN KEY (NUMEROCADEIA, CP) REFERENCES RESTAURANTES,
     FOREIGN KEY (CC) REFERENCES PESSOAS(CC)
 );
 
@@ -205,6 +209,81 @@ CREATE SEQUENCE numero_pedido START WITH 1 INCREMENT BY 1;
 --Para efeitos de DEBUG
 --DROP TABLE RESTAURANTES CASCADE CONSTRAINTS;
 
+--Ignora pedidos que já passaram
+CREATE OR REPLACE FUNCTION get_restaurant_capacity(
+    num_cadeia IN PEDIDO.NUMEROCADEIA%TYPE,
+    c_postal IN PEDIDOS.CP%TYPE
+) RETURN INT IS
+    capacity_left INT;
+    total_capacity INT;
+    total_clients INT;
+BEGIN
+    SELECT COALESCE(SUM(p.NUMEROCLIENTES)) -- COALESCE certifica que seja 0 se for null a consulta
+    INTO total_clients
+    FROM PEDIDOS p
+    WHERE p.NUMEROCADEIA = num_cadeia AND p.CP = c_postal AND p.TEMPO_TERMINO > SYSDATE;
+
+    SELECT r.CAPACIDADE_TOTAL
+    INTO total_capacity
+    FROM RESTAURANTES r
+    WHERE r.NUMEROCADEIA = num_cadeia AND r.CP = c_postal;
+    
+    capacity_left := total_capacity - total_clients;
+
+    RETURN capacity_left;
+
+END;
+/
+
+CREATE OR REPLACE TRIGGER check_capacity
+BEFORE INSERT ON PEDIDO
+FOR EACH ROW
+DECLARE
+    capacity INT;
+BEGIN
+    capacity := get_restaurant_capacity(:NEW.NUMEROCADEIA,:NEW.CP);
+    IF :NEW.NUMEROCLIENTES > capacity THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Não ha mais lugares no restaurante.');
+    END IF;
+END;
+/
+
+CREATE OR REPLACE FUNCTION check_expiration_date_over(
+    enc_nomeItem IN ENCOMENDA.NOMEITEM%TYPE
+) RETURN BOOLEAN IS
+    v_count INT;
+BEGIN 
+     SELECT COUNT(*)
+    INTO v_count
+    FROM CONSTITUICAO c 
+    JOIN INGREDIENTES i on i.CODIGOINGREDIENTES = c.CODIGOINGREDIENTE
+    WHERE c.NOMEITEM = enc_nomeItem AND i.DATAVALIDADE < SYSDATE;
+
+    IF v_count > 0 THEN
+        RETURN FALSE;
+    ELSE 
+        RETURN TRUE;
+    END IF;
+END;
+/
+
+CREATE OR REPLACE TRIGGER validate_item_order
+BEFORE INSERT ON ENCOMENDA
+FOR EACH ROW
+DECLARE
+    is_valid BOOLEAN;
+BEGIN
+    is_valid := check_expiration_date_over(:NEW.NOMEITEM);
+
+    IF NOT is_valid THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Item não possível.Ingredientes estão fora do prazo.');
+    END IF;
+END;
+/
+
+
+
+
 -- Verifica se está dentro do periodo de operação do restaurante --
 CREATE OR REPLACE FUNCTION check_order_time(
     p_numeroCadeia IN PEDIDOS.NUMEROCADEIA%TYPE,
@@ -224,6 +303,8 @@ BEGIN
     END IF;
 END;
 /
+
+
 
 CREATE OR REPLACE TRIGGER trg_check_order_time
 BEFORE INSERT OR UPDATE ON PEDIDOS
