@@ -187,7 +187,7 @@ CREATE SEQUENCE numero_pedido START WITH 1 INCREMENT BY 1;
 
 
 --Para efeitos de DEBUG
-DROP TABLE RESTAURANTES CASCADE CONSTRAINTS;
+--DROP TABLE RESTAURANTES CASCADE CONSTRAINTS;
 
 --Verifica se está dentro do periodo de operação do restaurante
 CREATE OR REPLACE FUNCTION check_order_time(
