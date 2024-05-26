@@ -231,8 +231,30 @@ CREATE SEQUENCE codigo_bens START WITH 10000 INCREMENT BY 1;
 CREATE SEQUENCE codigo_ingredientes START WITH 10000 INCREMENT BY 1;
 CREATE SEQUENCE numero_pedido START WITH 1 INCREMENT BY 1;
 
---Para efeitos de DEBUG
---DROP TABLE RESTAURANTES CASCADE CONSTRAINTS;
+
+
+ALTER TABLE RESTAURANTES
+ADD CONSTRAINT check_rest_has_emp
+CHECK (EXISTS (
+    SELECT 1
+    FROM FUNCIONARIOS f
+    JOIN PESSOAS p ON f.CC = p.CC
+    JOIN FREQUENTAM fr ON p.CC = fr.CC
+    WHERE fr.NUMEROCADEIA = RESTAURANTES.NUMEROCADEIA
+    AND fr.CP = RESTAURANTES.CP
+)) DEFERRABLE INITIALLY DEFERRED;
+
+
+ALTER TABLE FUNCIONARIOS
+ADD CONSTRAINT check_emp_has_rest
+CHECK (EXISTS (
+    SELECT 1
+    FROM FREQUENTAM fr
+    WHERE fr.CC = FUNCIONARIOS.CC
+)) DEFERRABLE INITIALLY DEFERRED;
+
+
+
 
 --Ignora pedidos que já passaram
 CREATE OR REPLACE FUNCTION get_restaurant_capacity(
@@ -593,9 +615,77 @@ BEGIN
 END;
 /
 
+--Garante que não há dois pedidos do mesmo cliente ao mesmo tempo em restaurntes diferentes--
+CREATE OR REPLACE TRIGGER prevent_concurrent_orders
+BEFORE INSERT ON PEDIDOS
+FOR EACH ROW
+DECLARE
+    v_count NUMBER;
+BEGIN
+    SELECT COUNT(*)
+    INTO v_count
+    FROM PEDIDOS p
+    WHERE p.CC = :NEW.CC
+      AND p.NUMEROPEDIDO <> :NEW.NUMEROPEDIDO -- Ignorar o próprio pedido
+      AND p.NUMEROCADEIA <> :NEW.NUMEROCADEIA
+      AND p.CP <> :NEW.CP
+      AND p.TEMPO_TERMINO > SYSDATE;
 
+    IF v_count > 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Cliente já tem um pedido em andamento em outro restaurante.');
+    END IF;
+END;
+/
+
+-- VIEWS --
+CREATE OR REPLACE VIEW vw_fornecedores_ingredientes
+AS
+SELECT p.NOMEPESSOA, p.NIF, p.EMAIL, i.NOME AS INGREDIENTE
+FROM PESSOAS p
+JOIN FORNECEDORES f ON p.CC = f.CC
+JOIN FORNECE ff ON f.CC = ff.CC
+JOIN INGREDIENTES i ON ff.CODIGOINGREDIENTE = i.CODIGOINGREDIENTES;
+
+--Pedidos por restaurante e cliente
+CREATE OR REPLACE VIEW vw_pedidos_restaurante_cliente
+AS
+SELECT p.NUMEROPEDIDO, r.NOMERESTAURANTE, pe.NOMEPESSOA, p.HORA, p.NUMEROCLIENTES
+FROM PEDIDOS p
+JOIN RESTAURANTES r ON p.NUMEROCADEIA = r.NUMEROCADEIA AND p.CP = r.CP
+JOIN PESSOAS pe ON p.CC = pe.CC;
+
+-- Ingredientes em falta por restaurante--
+CREATE OR REPLACE VIEW vw_ingredientes_em_falta AS
+SELECT r.NOMERESTAURANTE, i.NOME AS INGREDIENTE
+FROM STOCK s
+JOIN INGREDIENTES i ON s.CODIGOINGREDIENTES = i.CODIGOINGREDIENTES
+JOIN RESTAURANTES r ON s.NUMEROCADEIA = r.NUMEROCADEIA AND s.CP = r.CP
+WHERE s.QUANTIDADE_STOCK = 0;
+
+
+-- funcionários e seus cargos
+CREATE OR REPLACE VIEW vw_funcionarios_cargos
+AS
+SELECT p.NOMEPESSOA, p.NIF, p.EMAIL,
+       CASE
+           WHEN f.CC IS NOT NULL THEN 'Funcionário'
+           WHEN d.CC IS NOT NULL THEN 'Direção'
+           WHEN c.CC IS NOT NULL THEN 'Chef'
+           ELSE 'Outro'
+       END AS CARGO
+FROM PESSOAS p
+LEFT JOIN FUNCIONARIOS f ON p.CC = f.CC
+LEFT JOIN DIRECAO d ON p.CC = d.CC
+LEFT JOIN CHEF c ON p.CC = c.CC;
 
 /*
+-- Adiar a verificação das restrições
+SET CONSTRAINTS ALL DEFERRED;
+
+-- Inserir tuplos nas tabelas com adiamento de restrições
+
+
+
 -- Insere alguns ingredientes
 INSERT INTO INGREDIENTES (CODIGOINGREDIENTES, NOME, PROVENIENCIA, DATAVALIDADE, PRECO) VALUES
 (codigo_ingredientes.NEXTVAL, 'Frango', 'Portugal', DATE '2023-06-30', 5.00);
