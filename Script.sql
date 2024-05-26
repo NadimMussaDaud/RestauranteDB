@@ -1,7 +1,7 @@
 -- TODO: Criar asserções para os ISA para disjoint e ISA totais
 /* 
 - Efetuar pedido se houver espaço no restaurante. Acrescentar atributo numero_clientes em pedido TRIGGER
-- Subtrair em stock uma vez efetuado um pedido
+- Subtrair em stock uma vez efetuado um pedido #DONE
 - Efetuar ITEMS com Ingredientes que estejam dentro do prazo TRIGGER #DONE
 - Para encomendar ITEM Ingredientes todos tem que ter stock no local da encomenda TRIGGER
 - Certificar que todos empregados trabalham em algum lugar e em apenas 1???
@@ -398,6 +398,55 @@ BEGIN
     WHERE CodigoIngredientes = (SELECT CodigoIngredientes FROM Constituição WHERE NomeItem = NEW.NomeItem)
     AND NúmeroCadeia = (SELECT NúmeroCadeia FROM Pedidos WHERE NumeroPedido = NEW.NumeroPedido);
 END;
+
+CREATE TRIGGER trg_Encomenda_Insert
+ON Encomenda
+INSTEAD OF INSERT
+AS
+BEGIN
+    DECLARE @NumeroPedido INT;
+    DECLARE @NomeItem VARCHAR(100);
+    DECLARE @QuantidadeEncomenda INT;
+    DECLARE @NumeroCadeia INT;
+    DECLARE @CP INT;
+
+    -- Cursor para iterar sobre os registros inseridos
+    DECLARE cur CURSOR FOR
+    SELECT i.NumeroPedido, i.NomeItem, i.QuantidadeEncomenda, p.CP, p.NumeroCadeia
+    FROM INSERTED i
+    JOIN Pedidos p ON i.NumeroPedido = p.NumeroPedido;
+
+    OPEN cur;
+    FETCH NEXT FROM cur INTO @NumeroPedido, @NomeItem, @QuantidadeEncomenda, @CP, @NumeroCadeia;
+
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        -- Verifica se todos os ingredientes necessários estão em estoque
+        IF EXISTS (
+            SELECT 1
+            FROM Constituição c
+            JOIN Stock s ON c.CodigoIngrediente = s.CodigoIngredientes AND s.NúmeroCadeia = @NumeroCadeia
+            WHERE c.NomeItem = @NomeItem
+            AND s.Quantidade < (c.QuantidadeConst * @QuantidadeEncomenda)
+        )
+        BEGIN
+            -- Lança erro se algum ingrediente estiver em falta
+            RAISERROR ('Stock insuficiente para o item %s na quantidade de %d', 16, 1, @NomeItem, @QuantidadeEncomenda);
+            ROLLBACK TRANSACTION;
+            RETURN;
+        END
+
+        -- Insere o registro na tabela Encomenda se a verificação for bem-sucedida
+        INSERT INTO Encomenda (NumeroPedido, NomeItem, QuantidadeEncomenda)
+        VALUES (@NumeroPedido, @NomeItem, @QuantidadeEncomenda);
+
+        FETCH NEXT FROM cur INTO @NumeroPedido, @NomeItem, @QuantidadeEncomenda, @CP, @NumeroCadeia;
+    END
+
+    CLOSE cur;
+    DEALLOCATE cur;
+END;
+
 
 /
 
