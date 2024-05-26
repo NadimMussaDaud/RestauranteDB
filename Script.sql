@@ -387,6 +387,18 @@ BEGIN
     
     RETURN v_valor_total;
 END;
+
+
+CREATE TRIGGER UpdateStockAfterOrder
+AFTER INSERT ON Encomenda
+FOR EACH ROW
+BEGIN
+    UPDATE Stock
+    SET Quantidade = Quantidade - NEW.QuantidadeEncomenda
+    WHERE CodigoIngredientes = (SELECT CodigoIngredientes FROM Constituição WHERE NomeItem = NEW.NomeItem)
+    AND NúmeroCadeia = (SELECT NúmeroCadeia FROM Pedidos WHERE NumeroPedido = NEW.NumeroPedido);
+END;
+
 /
 
 /*
