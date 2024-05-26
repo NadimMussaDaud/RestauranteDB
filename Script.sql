@@ -389,63 +389,7 @@ BEGIN
 END;
 
 
-CREATE TRIGGER UpdateStockAfterOrder
-AFTER INSERT ON Encomenda
-FOR EACH ROW
-BEGIN
-    UPDATE Stock
-    SET Quantidade = Quantidade - NEW.QuantidadeEncomenda
-    WHERE CodigoIngredientes = (SELECT CodigoIngredientes FROM Constituição WHERE NomeItem = NEW.NomeItem)
-    AND NúmeroCadeia = (SELECT NúmeroCadeia FROM Pedidos WHERE NumeroPedido = NEW.NumeroPedido);
-END;
 
-CREATE TRIGGER trg_Encomenda_Insert
-ON Encomenda
-INSTEAD OF INSERT
-AS
-BEGIN
-    DECLARE @NumeroPedido INT;
-    DECLARE @NomeItem VARCHAR(100);
-    DECLARE @QuantidadeEncomenda INT;
-    DECLARE @NumeroCadeia INT;
-    DECLARE @CP INT;
-
-    -- Cursor para iterar sobre os registros inseridos
-    DECLARE cur CURSOR FOR
-    SELECT i.NumeroPedido, i.NomeItem, i.QuantidadeEncomenda, p.CP, p.NumeroCadeia
-    FROM INSERTED i
-    JOIN Pedidos p ON i.NumeroPedido = p.NumeroPedido;
-
-    OPEN cur;
-    FETCH NEXT FROM cur INTO @NumeroPedido, @NomeItem, @QuantidadeEncomenda, @CP, @NumeroCadeia;
-
-    WHILE @@FETCH_STATUS = 0
-    BEGIN
-        -- Verifica se todos os ingredientes necessários estão em estoque
-        IF EXISTS (
-            SELECT 1
-            FROM Constituição c
-            JOIN Stock s ON c.CodigoIngrediente = s.CodigoIngredientes AND s.NúmeroCadeia = @NumeroCadeia
-            WHERE c.NomeItem = @NomeItem
-            AND s.Quantidade < (c.QuantidadeConst * @QuantidadeEncomenda)
-        )
-        BEGIN
-            -- Lança erro se algum ingrediente estiver em falta
-            RAISERROR ('Stock insuficiente para o item %s na quantidade de %d', 16, 1, @NomeItem, @QuantidadeEncomenda);
-            ROLLBACK TRANSACTION;
-            RETURN;
-        END
-
-        -- Insere o registro na tabela Encomenda se a verificação for bem-sucedida
-        INSERT INTO Encomenda (NumeroPedido, NomeItem, QuantidadeEncomenda)
-        VALUES (@NumeroPedido, @NomeItem, @QuantidadeEncomenda);
-
-        FETCH NEXT FROM cur INTO @NumeroPedido, @NomeItem, @QuantidadeEncomenda, @CP, @NumeroCadeia;
-    END
-
-    CLOSE cur;
-    DEALLOCATE cur;
-END;
 
 
 /
