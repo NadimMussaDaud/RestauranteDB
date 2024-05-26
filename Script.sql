@@ -2,7 +2,7 @@
 /* 
 - Criar asserções para os ISA para disjoint e ISA totais #DONE
 - Efetuar pedido se houver espaço no restaurante. Acrescentar atributo numero_clientes em pedido TRIGGER #DONE
--Um prato ou bebida tem que fazer parte de um item #DONE
+- Um prato ou bebida tem que fazer parte de um item #DONE
 - Efetuar ITEMS com Ingredientes que estejam dentro do prazo TRIGGER #DONE
 - Subtrair em stock uma vez efetuado um pedido #DONE
 - Para encomendar ITEM Ingredientes todos tem que ter stock no local da encomenda TRIGGER #DONE
