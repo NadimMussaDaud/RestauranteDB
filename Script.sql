@@ -1,16 +1,44 @@
--- TODO: Criar asserções para os ISA para disjoint e ISA totais
+-- TODO: 
 /* 
-- Efetuar pedido se houver espaço no restaurante. Acrescentar atributo numero_clientes em pedido TRIGGER
-- Subtrair em stock uma vez efetuado um pedido
-- Efetuar ITEMS com Ingredientes que estejam dentro do prazo TRIGGER #DONE
-- Para encomendar ITEM Ingredientes todos tem que ter stock no local da encomenda TRIGGER
-- Certificar que todos empregados trabalham em algum lugar e em apenas 1???
-- A cada momento apenas pode existir um menu de uma epoca em um restaurante.
-- Empregados precisam necessariamente de ter algum gerente.
-- Um item pode ser um ingrediente. Certificar que o Item se é prato não é mais nada
+- Criar asserções para os ISA para disjoint e ISA totais #DONE
+- Efetuar pedido se houver espaço no restaurante. Acrescentar atributo numero_clientes em pedido TRIGGER #DONE
 -Um prato ou bebida tem que fazer parte de um item #DONE
+- Efetuar ITEMS com Ingredientes que estejam dentro do prazo TRIGGER #DONE
+- Subtrair em stock uma vez efetuado um pedido #DONE
+- Para encomendar ITEM Ingredientes todos tem que ter stock no local da encomenda TRIGGER #DONE
+- Certificar que todos empregados trabalham em algum lugar e todo restaurante tenha algum empregado
+- A cada momento apenas pode existir um menu de uma epoca em um restaurante.
+- Empregados podem nao ter algum gerente. #DONE
+- Um item pode ser um ingrediente. Certificar que o Item se é prato não é mais nada #DONE
 
 */
+
+DROP TABLE RESTAURANTES CASCADE CONSTRAINTS;
+DROP TABLE MORADA CASCADE CONSTRAINTS;
+DROP TABLE MOBILIA_MATERIAIS CASCADE CONSTRAINTS;
+DROP TABLE PESSOAS CASCADE CONSTRAINTS;
+DROP TABLE FUNCIONARIOS CASCADE CONSTRAINTS;
+DROP TABLE FORNECEDORES CASCADE CONSTRAINTS;
+DROP TABLE DIRECAO CASCADE CONSTRAINTS;
+DROP TABLE CHEF CASCADE CONSTRAINTS;
+DROP TABLE CONTACTOS CASCADE CONSTRAINTS;
+DROP TABLE PEDIDOS CASCADE CONSTRAINTS;
+DROP TABLE CARDAPIO CASCADE CONSTRAINTS;
+DROP TABLE INGREDIENTES CASCADE CONSTRAINTS;
+DROP TABLE ITEM CASCADE CONSTRAINTS;
+DROP TABLE PRATO CASCADE CONSTRAINTS;
+DROP TABLE BEBIDA CASCADE CONSTRAINTS;
+DROP TABLE STOCK CASCADE CONSTRAINTS;
+DROP TABLE PRATO CASCADE CONSTRAINTS;
+DROP TABLE INVENTARIO CASCADE CONSTRAINTS;
+DROP TABLE ENCOMENDA CASCADE CONSTRAINTS;
+DROP TABLE FREQUENTAM CASCADE CONSTRAINTS;
+DROP TABLE CARTAS CASCADE CONSTRAINTS;
+DROP TABLE PRATO CASCADE CONSTRAINTS;
+DROP TABLE GERE CASCADE CONSTRAINTS;
+DROP TABLE FORNECE CASCADE CONSTRAINTS;
+DROP TABLE CONSTITUICAO CASCADE CONSTRAINTS;
+
 
 
 CREATE TABLE RESTAURANTES (
@@ -95,7 +123,6 @@ CREATE TABLE CARDAPIO (
     NOMECARDAPIO VARCHAR(100) -- Pode não ter nome o cardápio --
 );
 
-DROP TABLE INGREDIENTES CASCADE CONSTRAINTS;
 
 CREATE TABLE INGREDIENTES (
     CODIGOINGREDIENTES INT PRIMARY KEY,
@@ -105,7 +132,6 @@ CREATE TABLE INGREDIENTES (
     PRECO DECIMAL(10, 2) CHECK (PRECO > 0)
 );
 
-DROP TABLE ITEM CASCADE CONSTRAINTS;
 
 CREATE TABLE ITEM (
     NOMEITEM VARCHAR(100) PRIMARY KEY,
@@ -115,7 +141,6 @@ CREATE TABLE ITEM (
     FOREIGN KEY (EPOCA) REFERENCES CARDAPIO(EPOCA)
 );
 
-DROP TABLE PRATO CASCADE CONSTRAINTS;
 
 CREATE TABLE PRATO (
     NOMEITEM VARCHAR(100),
@@ -253,7 +278,7 @@ CREATE OR REPLACE FUNCTION check_expiration_date_over(
 ) RETURN BOOLEAN IS
     v_count INT;
 BEGIN 
-     SELECT COUNT(*)
+    SELECT COUNT(*)
     INTO v_count
     FROM CONSTITUICAO c 
     JOIN INGREDIENTES i on i.CODIGOINGREDIENTES = c.CODIGOINGREDIENTE
@@ -388,6 +413,187 @@ BEGIN
     RETURN v_valor_total;
 END;
 /
+
+CREATE OR REPLACE TRIGGER verificar_stock_antes_pedido
+BEFORE INSERT ON PEDIDOS
+FOR EACH ROW
+DECLARE
+    v_quantidade_necessaria INT;
+    v_quantidade_stock INT;
+BEGIN
+    FOR ingrediente IN (
+        SELECT c.CODIGOINGREDIENTE, c.QUANTIDADECONST
+        FROM CONSTITUICAO c
+        WHERE c.NOMEITEM = :NEW.NOMEITEM
+    ) LOOP
+        SELECT s.QUANTIDADE_STOCK
+        INTO v_quantidade_stock
+        FROM STOCK s
+        WHERE s.CODIGOINGREDIENTES = ingrediente.CODIGOINGREDIENTE
+            AND s.NUMEROCADEIA = :NEW.NUMEROCADEIA
+            AND s.CP = :NEW.CP;
+
+        v_quantidade_necessaria := ingrediente.QUANTIDADECONST;
+
+
+        IF v_quantidade_stock < v_quantidade_necessaria THEN
+            RAISE_APPLICATION_ERROR(-20001, 'Stock insuficiente para o ingrediente: ' || ingrediente.CODIGOINGREDIENTE);
+        END IF;
+    END LOOP;
+END;
+/
+
+
+CREATE OR REPLACE TRIGGER atualizar_stock_apos_pedido
+AFTER INSERT ON PEDIDOS
+FOR EACH ROW
+BEGIN
+    FOR ingrediente IN (
+        SELECT c.CODIGOINGREDIENTE, c.QUANTIDADECONST
+        FROM CONSTITUICAO c
+        WHERE c.NOMEITEM = :NEW.NOMEITEM
+    ) LOOP
+        UPDATE STOCK s
+        SET s.QUANTIDADE_STOCK = s.QUANTIDADE_STOCK - ingrediente.QUANTIDADECONST
+        WHERE s.CODIGOINGREDIENTES = ingrediente.CODIGOINGREDIENTE
+            AND s.NUMEROCADEIA = :NEW.NUMEROCADEIA
+            AND s.CP = :NEW.CP;
+    END LOOP;
+END;
+/ 
+
+CREATE OR REPLACE TRIGGER check_key_in_funcionarios
+BEFORE INSERT OR UPDATE ON FORNECEDORES
+FOR EACH ROW
+DECLARE
+    v_count INT;
+BEGIN
+    SELECT COUNT(*)
+    INTO v_count
+    FROM FUNCIONARIOS f
+    WHERE f.CC = :NEW.CC;
+
+    IF v_count > 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Chave duplicada encontrada em Funcionários.');
+    END IF;
+END;
+/
+
+CREATE OR REPLACE TRIGGER check_key_in_fornecedores
+BEFORE INSERT OR UPDATE ON FUNCIONARIOS
+FOR EACH ROW
+DECLARE
+    v_count INT;
+BEGIN
+    SELECT COUNT(*)
+    INTO v_count
+    FROM FORNECEDORES f
+    WHERE f.CC = :NEW.CC;
+
+    IF v_count > 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Chave duplicada encontrada em Fornecedores.');
+    END IF;
+END;
+/
+
+CREATE OR REPLACE TRIGGER check_key_in_prato
+BEFORE INSERT OR UPDATE ON BEBIDA
+FOR EACH ROW
+DECLARE
+    v_count INT;
+BEGIN
+    SELECT COUNT(*)
+    INTO v_count
+    FROM PRATO p
+    WHERE p.NOMEITEM = :NEW.NOMEITEM;
+
+    IF v_count > 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Chave duplicada encontrada em Prato.');
+    END IF;
+END;
+/
+
+
+CREATE OR REPLACE TRIGGER check_key_in_bebidas
+BEFORE INSERT OR UPDATE ON PRATO
+FOR EACH ROW
+DECLARE
+    v_count INT;
+BEGIN
+    SELECT COUNT(*)
+    INTO v_count
+    FROM BEBIDA b
+    WHERE b.NOMEITEM = :NEW.NOMEITEM;
+
+    IF v_count > 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Chave duplicada encontrada em Bebida.');
+    END IF;
+END;
+/
+
+
+
+CREATE OR REPLACE TRIGGER ensure_item_is_prato_ou_bebida
+BEFORE INSERT OR UPDATE ON ITEM
+FOR EACH ROW
+DECLARE
+    v_count INT;
+BEGIN
+    -- Verificar se a chave existe em Prato ou Bebida
+    SELECT COUNT(*)
+    INTO v_count
+    FROM PRATO p
+    WHERE  p.NOMEITEM = :NEW.NOMEITEM;
+
+    IF v_count = 0 THEN
+        SELECT COUNT(*)
+        INTO v_count
+        FROM BEBIDA b
+        WHERE  b.NOMEITEM = :NEW.NOMEITEM;
+
+        IF v_count = 0 THEN
+            RAISE_APPLICATION_ERROR(-20003, 'A chave deve ser um Prato ou Bebida.');
+        END IF;
+    END IF;
+END;
+/
+
+
+CREATE OR REPLACE TRIGGER check_key_in_chef
+BEFORE INSERT OR UPDATE ON DIRECAO
+FOR EACH ROW
+DECLARE
+    v_count INT;
+BEGIN
+    SELECT COUNT(*)
+    INTO v_count
+    FROM CHEF c
+    WHERE c.CC = :NEW.CC;
+
+    IF v_count > 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Chave duplicada encontrada em Chef.');
+    END IF;
+END;
+/
+
+CREATE OR REPLACE TRIGGER check_key_in_direcao
+BEFORE INSERT OR UPDATE ON CHEF
+FOR EACH ROW
+DECLARE
+    v_count INT;
+BEGIN
+    SELECT COUNT(*)
+    INTO v_count
+    FROM DIRECAO d
+    WHERE d.CC = :NEW.CC;
+
+    IF v_count > 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Chave duplicada encontrada em Direcao.');
+    END IF;
+END;
+/
+
+
 
 /*
 -- Insere alguns ingredientes
