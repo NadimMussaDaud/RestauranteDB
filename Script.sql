@@ -15,7 +15,7 @@ Na realização de algumas funções
 - Efetuar ITEMS com Ingredientes que estejam dentro do prazo TRIGGER #DONE
 - Subtrair em stock uma vez efetuado um pedido #DONE
 - Para encomendar ITEM Ingredientes todos tem que ter stock no local da encomenda TRIGGER #DONE
-- Certificar que todos empregados trabalham em algum lugar e todo restaurante tenha algum empregado
+- Certificar que todos empregados trabalham em algum lugar e todo restaurante tenha algum empregado #DONE
 - Empregados podem nao ter algum gerente. #DONE
 - Um item pode ser um ingrediente. Certificar que o Item se é prato não é mais nada #DONE
 - A cada momento apenas pode existir um menu de uma epoca em um restaurante.
@@ -23,7 +23,7 @@ Na realização de algumas funções
 - Implementar DELETE ON CASCADE #DONE
 - 1 consulta com JOIN #DONE
 - 1 consulta com AGREGAÇÕES #DONE
-- 1 consulta com OPERAÇÕES DE CONJUNTOS
+- 1 consulta com OPERAÇÕES DE CONJUNTOS #DONE
 */
 
 DROP TABLE RESTAURANTES CASCADE CONSTRAINTS;
@@ -185,7 +185,7 @@ CREATE TABLE INVENTARIO (
     QUANTIDADE_INVENTARIO INT CHECK( QUANTIDADE_INVENTARIO >= 0),
     PRIMARY KEY (NUMEROCADEIA, CP, CODIGOBENS),
     FOREIGN KEY (NUMEROCADEIA, CP) REFERENCES RESTAURANTES(NUMEROCADEIA, CP) ON DELETE CASCADE,
-    FOREIGN KEY (CODIGOBENS) REFERENCES BENS(CODIGOBENS) ON DELETE CASCADE
+    FOREIGN KEY (CODIGOBENS) REFERENCES MOBILIA_MATERIAIS(CODIGOBENS) ON DELETE CASCADE
 );
 
 CREATE TABLE FREQUENTAM (
@@ -836,7 +836,7 @@ END;
 /
 
 CREATE OR REPLACE TRIGGER update_cascade_bens
-BEFORE UPDATE ON BENS
+BEFORE UPDATE ON MOBILIA_MATERIAIS
 FOR EACH ROW
 BEGIN
     UPDATE INVENTARIO
